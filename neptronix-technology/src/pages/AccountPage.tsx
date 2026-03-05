@@ -38,11 +38,15 @@ const AccountPage: React.FC = () => {
 
   const user = authState.user;
 
-  const NOTIF_KEY = `notif_prefs_${user?.id ?? 'guest'}`;
-  const loadNotifPrefs = () => {
-    try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || 'null'); } catch { return null; }
+  const getNotifKey = (uid?: string) => `notif_prefs_${uid ?? 'guest'}`;
+  const readNotifPrefs = (uid?: string): boolean[] => {
+    try {
+      const stored = localStorage.getItem(getNotifKey(uid));
+      const parsed = stored ? JSON.parse(stored) : null;
+      return Array.isArray(parsed) ? parsed : [true, true, false, false];
+    } catch { return [true, true, false, false]; }
   };
-  const [notifPrefs, setNotifPrefs] = useState<boolean[]>(() => loadNotifPrefs() ?? [true, true, false, false]);
+  const [notifPrefs, setNotifPrefs] = useState<boolean[]>([true, true, false, false]);
 
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwError, setPwError] = useState('');
@@ -61,6 +65,10 @@ const AccountPage: React.FC = () => {
     email: user?.email ?? '',
     phone: user?.phone ?? ''
   });
+
+  useEffect(() => {
+    setNotifPrefs(readNotifPrefs(user?.id));
+  }, [user?.id]);
 
   useEffect(() => {
     setProfileData({
@@ -168,7 +176,7 @@ const AccountPage: React.FC = () => {
   const handleNotifToggle = (index: number) => {
     const updated = notifPrefs.map((v, i) => (i === index ? !v : v));
     setNotifPrefs(updated);
-    localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+    localStorage.setItem(getNotifKey(user?.id), JSON.stringify(updated));
   };
 
   const initials = `${profileData.firstName?.[0] ?? ''}${profileData.lastName?.[0] ?? ''}`.toUpperCase() || '?';

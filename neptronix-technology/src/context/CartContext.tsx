@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { CartItem, Product } from '../types';
 
@@ -85,12 +85,25 @@ const calculateTotals = (state: CartState): CartState => {
   return { ...state, itemCount, total };
 };
 
+const CART_KEY = 'neptronix_cart';
+
+const loadCart = (): CartState => {
+  try {
+    const saved = localStorage.getItem(CART_KEY);
+    if (saved) {
+      const items = JSON.parse(saved);
+      if (Array.isArray(items)) return calculateTotals({ items, total: 0, itemCount: 0 });
+    }
+  } catch {}
+  return { items: [], total: 0, itemCount: 0 };
+};
+
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(cartReducer, {
-    items: [],
-    total: 0,
-    itemCount: 0
-  });
+  const [state, dispatch] = useReducer(cartReducer, undefined, loadCart);
+
+  useEffect(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify(state.items));
+  }, [state.items]);
 
   const addToCart = (product: Product, quantity = 1) => {
     dispatch({ type: 'ADD_TO_CART', payload: { product, quantity } });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HeartIcon,
@@ -9,13 +9,41 @@ import {
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 
+export const WISHLIST_KEY = 'neptronix_wishlist';
+
+export const getWishlistIds = (): string[] => {
+  try { return JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]'); } catch { return []; }
+};
+
+export const toggleWishlistItem = (productId: string): boolean => {
+  const ids = getWishlistIds();
+  const exists = ids.includes(productId);
+  const updated = exists ? ids.filter(id => id !== productId) : [...ids, productId];
+  localStorage.setItem(WISHLIST_KEY, JSON.stringify(updated));
+  return !exists;
+};
+
 const WishlistPage: React.FC = () => {
   const { addToCart } = useCart();
   const { products } = useProducts();
-  const [wishlistItems, setWishlistItems] = useState(products.slice(0, 4));
+  const [wishlistIds, setWishlistIds] = useState<string[]>(getWishlistIds);
+  const wishlistItems = products.filter(p => wishlistIds.includes(p.id));
+
+  useEffect(() => {
+    const onStorage = () => setWishlistIds(getWishlistIds());
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const removeFromWishlist = (productId: string) => {
-    setWishlistItems(prev => prev.filter(p => p.id !== productId));
+    const updated = wishlistIds.filter(id => id !== productId);
+    setWishlistIds(updated);
+    localStorage.setItem(WISHLIST_KEY, JSON.stringify(updated));
+  };
+
+  const clearAll = () => {
+    setWishlistIds([]);
+    localStorage.setItem(WISHLIST_KEY, JSON.stringify([]));
   };
 
   const handleAddToCart = (product: typeof products[0]) => {
@@ -45,7 +73,7 @@ const WishlistPage: React.FC = () => {
           <h1 className="text-lg font-semibold text-gray-900">
             My Wishlist <span className="text-gray-400 font-normal text-sm">({wishlistItems.length} items)</span>
           </h1>
-          <button onClick={() => setWishlistItems([])} className="text-sm text-red-500 hover:text-red-600">
+          <button onClick={clearAll} className="text-sm text-red-500 hover:text-red-600">
             Clear All
           </button>
         </div>
