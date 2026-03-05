@@ -1,12 +1,6 @@
 const ENV_API_URL = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
 const BASE_URL = ENV_API_URL || 'http://localhost:5000/api';
 
-const isBrowser = typeof window !== 'undefined';
-const isLocalhost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-if (isBrowser && !isLocalhost && !ENV_API_URL) {
-  throw new Error('Missing VITE_API_URL. Configure it in Netlify environment variables (e.g. https://your-backend.com/api).');
-}
-
 const getToken = () => localStorage.getItem('authToken');
 
 const headers = (withAuth = false): HeadersInit => {
