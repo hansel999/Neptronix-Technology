@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   UserIcon,
@@ -9,66 +9,65 @@ import {
   CheckCircleIcon,
   ClockIcon,
   XCircleIcon,
-  PencilIcon
+  PencilIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
-
-const sampleOrders = [
-  {
-    id: 'NTX-10045823',
-    date: '2024-12-20',
-    status: 'delivered' as const,
-    total: 449.98,
-    items: [
-      { name: '4K Ultra HD CCTV Camera System', qty: 1, price: 299.99 },
-      { name: 'Smart Doorbell Camera', qty: 1, price: 149.99 }
-    ],
-    tracking: 'NP1234567890',
-    estimatedDelivery: '2024-12-25'
-  },
-  {
-    id: 'NTX-10045790',
-    date: '2024-12-15',
-    status: 'shipped' as const,
-    total: 599.99,
-    items: [
-      { name: 'PTZ Security Camera with 32x Zoom', qty: 1, price: 599.99 }
-    ],
-    tracking: 'NP9876543210',
-    estimatedDelivery: '2024-12-28'
-  },
-  {
-    id: 'NTX-10045650',
-    date: '2024-11-28',
-    status: 'processing' as const,
-    total: 199.99,
-    items: [
-      { name: 'Wireless Security Camera 2-Pack', qty: 1, price: 199.99 }
-    ],
-    tracking: '',
-    estimatedDelivery: '2025-01-05'
-  }
-];
+import { ordersAPI } from '../services/api';
 
 type Tab = 'profile' | 'orders' | 'addresses' | 'settings';
+
+interface ApiOrder {
+  _id?: string;
+  id?: string;
+  createdAt?: string;
+  status?: string;
+  total?: number;
+  items?: { product?: { name?: string }; quantity?: number; price?: number }[];
+  trackingNumber?: string;
+  estimatedDelivery?: string;
+}
 
 const AccountPage: React.FC = () => {
   const { state: authState, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [isEditing, setIsEditing] = useState(false);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const user = authState.user;
 
   const [profileData, setProfileData] = useState({
-    firstName: authState.user?.firstName || 'John',
-    lastName: authState.user?.lastName || 'Doe',
-    email: authState.user?.email || 'john@example.com',
-    phone: authState.user?.phone || '+977-9876543210'
+    firstName: user?.firstName ?? '',
+    lastName: user?.lastName ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? ''
   });
+
+  useEffect(() => {
+    setProfileData({
+      firstName: user?.firstName ?? '',
+      lastName: user?.lastName ?? '',
+      email: user?.email ?? '',
+      phone: user?.phone ?? ''
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated && activeTab === 'orders') {
+      setOrdersLoading(true);
+      ordersAPI.getAll()
+        .then((data: ApiOrder[]) => setOrders(Array.isArray(data) ? data : []))
+        .catch(() => setOrders([]))
+        .finally(() => setOrdersLoading(false));
+    }
+  }, [authState.isAuthenticated, activeTab]);
 
   if (!authState.isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center">
-        <div className="bg-white shadow-sm p-10 max-w-md w-full text-center">
+      <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center px-4">
+        <div className="bg-white shadow-sm p-8 max-w-md w-full text-center rounded-lg">
           <UserIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Please Sign In</h2>
           <p className="text-gray-500 text-sm mb-6">You need to be logged in to access your account.</p>
@@ -83,7 +82,7 @@ const AccountPage: React.FC = () => {
     );
   }
 
-  const statusConfig = {
+  const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
     pending: { color: 'text-yellow-600 bg-yellow-100', icon: ClockIcon, label: 'Pending' },
     processing: { color: 'text-blue-600 bg-blue-100', icon: CogIcon, label: 'Processing' },
     shipped: { color: 'text-purple-600 bg-purple-100', icon: TruckIcon, label: 'Shipped' },
@@ -101,6 +100,8 @@ const AccountPage: React.FC = () => {
     setIsEditing(false);
   };
 
+  const initials = `${profileData.firstName?.[0] ?? ''}${profileData.lastName?.[0] ?? ''}`.toUpperCase() || '?';
+
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: 'profile', label: 'Profile', icon: UserIcon },
     { key: 'orders', label: 'Orders', icon: ShoppingBagIcon },
@@ -108,23 +109,50 @@ const AccountPage: React.FC = () => {
     { key: 'settings', label: 'Settings', icon: CogIcon },
   ];
 
+  const addresses = user?.addresses ?? [];
+  const wishlistCount = user?.wishlist?.length ?? 0;
+  const totalSpent = orders.reduce((sum, o) => sum + (o.total ?? 0), 0);
+
   return (
-    <div className="min-h-screen bg-[#f1f3f6]">
+    <div className="min-h-screen bg-[#f1f3f6] pb-20 md:pb-4">
       <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3">
+
+        {/* Mobile: user header strip */}
+        <div className="md:hidden bg-white shadow-sm rounded-lg mb-3 p-4 flex items-center gap-3">
+          <div className="w-12 h-12 bg-[#2874f0] rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-lg font-bold text-white">{initials}</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">Hello,</p>
+            <p className="font-bold text-gray-900 text-sm truncate">
+              {profileData.firstName || profileData.email || 'User'}
+              {profileData.lastName ? ` ${profileData.lastName}` : ''}
+            </p>
+            <p className="text-xs text-gray-400 truncate">{profileData.email}</p>
+          </div>
+          <button
+            onClick={() => { logout(); navigate('/'); }}
+            className="ml-auto flex items-center gap-1 text-red-500 text-xs font-medium shrink-0"
+          >
+            <ArrowRightOnRectangleIcon className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+
         <div className="flex gap-3 items-start">
-          {/* Sidebar */}
-          <div className="w-64 flex-shrink-0">
-            <div className="bg-white shadow-sm">
-              {/* User info */}
+          {/* Sidebar – desktop only */}
+          <div className="hidden md:block w-64 flex-shrink-0">
+            <div className="bg-white shadow-sm rounded-lg">
               <div className="p-4 flex items-center gap-3 border-b border-gray-100">
                 <div className="w-12 h-12 bg-[#2874f0] rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg font-bold text-white">
-                    {profileData.firstName[0]}{profileData.lastName[0]}
-                  </span>
+                  <span className="text-lg font-bold text-white">{initials}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-gray-500">Hello,</p>
-                  <p className="font-bold text-gray-900 text-sm truncate">{profileData.firstName} {profileData.lastName}</p>
+                  <p className="font-bold text-gray-900 text-sm truncate">
+                    {profileData.firstName || profileData.email || 'User'}
+                    {profileData.lastName ? ` ${profileData.lastName}` : ''}
+                  </p>
                 </div>
               </div>
               <nav className="py-2">
@@ -146,6 +174,7 @@ const AccountPage: React.FC = () => {
                   onClick={() => { logout(); navigate('/'); }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 border-l-4 border-transparent transition-colors"
                 >
+                  <ArrowRightOnRectangleIcon className="h-4 w-4" />
                   Logout
                 </button>
               </nav>
@@ -154,9 +183,10 @@ const AccountPage: React.FC = () => {
 
           {/* Content */}
           <div className="flex-1 min-w-0 space-y-3">
+
             {/* Profile Tab */}
             {activeTab === 'profile' && (
-              <div className="bg-white shadow-sm p-6">
+              <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
                 <div className="flex justify-between items-center mb-5">
                   <h2 className="text-base font-semibold text-gray-900">Personal Information</h2>
                   {!isEditing ? (
@@ -165,12 +195,12 @@ const AccountPage: React.FC = () => {
                     </button>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={() => setIsEditing(false)} className="text-gray-600 text-sm px-3 py-1 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
-                      <button onClick={handleSaveProfile} className="bg-[#2874f0] text-white text-sm px-3 py-1 rounded hover:bg-[#1a65de]">Save</button>
+                      <button onClick={() => { setIsEditing(false); setProfileData({ firstName: user?.firstName ?? '', lastName: user?.lastName ?? '', email: user?.email ?? '', phone: user?.phone ?? '' }); }} className="text-gray-600 text-sm px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50">Cancel</button>
+                      <button onClick={handleSaveProfile} className="bg-[#2874f0] text-white text-sm px-3 py-1.5 rounded hover:bg-[#1a65de]">Save</button>
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { name: 'firstName', label: 'First Name' },
                     { name: 'lastName', label: 'Last Name' },
@@ -182,27 +212,29 @@ const AccountPage: React.FC = () => {
                       {isEditing ? (
                         <input
                           type="text"
-                          value={(profileData as any)[field.name]}
+                          value={(profileData as Record<string, string>)[field.name]}
                           onChange={(e) => setProfileData(prev => ({ ...prev, [field.name]: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-[#2874f0]"
                         />
                       ) : (
-                        <p className="text-gray-900 font-medium text-sm">{(profileData as any)[field.name]}</p>
+                        <p className="text-gray-900 font-medium text-sm break-all">
+                          {(profileData as Record<string, string>)[field.name] || <span className="text-gray-400 font-normal">—</span>}
+                        </p>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                  <div className="bg-blue-50 rounded p-4 text-center">
-                    <p className="text-2xl font-bold text-[#2874f0]">{sampleOrders.length}</p>
+                <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="bg-blue-50 rounded p-3 sm:p-4 text-center">
+                    <p className="text-xl sm:text-2xl font-bold text-[#2874f0]">{orders.length}</p>
                     <p className="text-xs text-gray-500 mt-1">Total Orders</p>
                   </div>
-                  <div className="bg-green-50 rounded p-4 text-center">
-                    <p className="text-2xl font-bold text-[#388e3c]">0</p>
-                    <p className="text-xs text-gray-500 mt-1">Wishlist Items</p>
+                  <div className="bg-green-50 rounded p-3 sm:p-4 text-center">
+                    <p className="text-xl sm:text-2xl font-bold text-[#388e3c]">{wishlistCount}</p>
+                    <p className="text-xs text-gray-500 mt-1">Wishlist</p>
                   </div>
-                  <div className="bg-orange-50 rounded p-4 text-center">
-                    <p className="text-lg font-bold text-orange-600">Rs.1,249</p>
+                  <div className="bg-orange-50 rounded p-3 sm:p-4 text-center">
+                    <p className="text-sm sm:text-lg font-bold text-orange-600">Rs.{totalSpent.toLocaleString()}</p>
                     <p className="text-xs text-gray-500 mt-1">Total Spent</p>
                   </div>
                 </div>
@@ -212,76 +244,94 @@ const AccountPage: React.FC = () => {
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div className="space-y-2">
-                <div className="bg-white shadow-sm px-4 py-3">
+                <div className="bg-white shadow-sm rounded-lg px-4 py-3">
                   <h2 className="text-base font-semibold text-gray-900">Order History</h2>
                 </div>
-                {sampleOrders.map(order => {
-                  const config = statusConfig[order.status];
-                  return (
-                    <div key={order.id} className="bg-white shadow-sm p-5">
-                      <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm">{order.id}</p>
-                          <p className="text-xs text-gray-400">Placed on {order.date}</p>
-                        </div>
-                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${config.color}`}>
-                          <config.icon className="h-3.5 w-3.5" />{config.label}
-                        </div>
-                      </div>
-                      <div className="border-t border-gray-100 pt-3 space-y-1.5">
-                        {order.items.map((item, i) => (
-                          <div key={i} className="flex justify-between text-sm">
-                            <span className="text-gray-600">{item.name} ×{item.qty}</span>
-                            <span className="font-medium">Rs.{item.price.toLocaleString()}</span>
+                {ordersLoading ? (
+                  <div className="bg-white shadow-sm rounded-lg p-10 text-center text-gray-400 text-sm">Loading orders…</div>
+                ) : orders.length === 0 ? (
+                  <div className="bg-white shadow-sm rounded-lg p-10 text-center">
+                    <ShoppingBagIcon className="h-12 w-12 text-gray-200 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm font-medium">No orders yet</p>
+                    <p className="text-gray-400 text-xs mt-1">Your order history will appear here.</p>
+                    <Link to="/products" className="mt-4 inline-block bg-[#2874f0] text-white text-sm px-5 py-2 rounded font-bold hover:bg-[#1a65de]">Shop Now</Link>
+                  </div>
+                ) : (
+                  orders.map(order => {
+                    const orderId = order._id ?? order.id ?? '';
+                    const rawStatus = order.status ?? 'pending';
+                    const config = statusConfig[rawStatus] ?? statusConfig['pending'];
+                    const date = order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—';
+                    return (
+                      <div key={orderId} className="bg-white shadow-sm rounded-lg p-4 sm:p-5">
+                        <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">{orderId}</p>
+                            <p className="text-xs text-gray-400">Placed on {date}</p>
                           </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-gray-100 mt-3 pt-3 flex flex-wrap justify-between items-center gap-2">
-                        <div className="text-xs text-gray-400">
-                          {order.tracking && <span>Tracking: <span className="text-gray-700 font-medium">{order.tracking}</span></span>}
-                          {order.estimatedDelivery && <span className="ml-3">Est. Delivery: {order.estimatedDelivery}</span>}
+                          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${config.color}`}>
+                            <config.icon className="h-3.5 w-3.5" />{config.label}
+                          </div>
                         </div>
-                        <p className="text-sm font-bold text-gray-900">Total: Rs.{order.total.toLocaleString()}</p>
+                        {order.items && order.items.length > 0 && (
+                          <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                            {order.items.map((item, i) => (
+                              <div key={i} className="flex justify-between text-sm gap-2">
+                                <span className="text-gray-600 truncate">{item.product?.name ?? 'Product'} ×{item.quantity ?? 1}</span>
+                                <span className="font-medium shrink-0">Rs.{(item.price ?? 0).toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="border-t border-gray-100 mt-3 pt-3 flex flex-wrap justify-between items-center gap-2">
+                          <div className="text-xs text-gray-400">
+                            {order.trackingNumber && <span>Tracking: <span className="text-gray-700 font-medium">{order.trackingNumber}</span></span>}
+                            {order.estimatedDelivery && <span className="ml-2">Est. Delivery: {order.estimatedDelivery}</span>}
+                          </div>
+                          <p className="text-sm font-bold text-gray-900">Total: Rs.{(order.total ?? 0).toLocaleString()}</p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             )}
 
             {/* Addresses Tab */}
             {activeTab === 'addresses' && (
               <div className="space-y-3">
-                <div className="bg-white shadow-sm px-4 py-3 flex justify-between items-center">
+                <div className="bg-white shadow-sm rounded-lg px-4 py-3 flex justify-between items-center">
                   <h2 className="text-base font-semibold text-gray-900">Saved Addresses</h2>
-                  <button className="bg-[#2874f0] text-white px-4 py-2 rounded text-sm font-bold hover:bg-[#1a65de]">+ Add Address</button>
+                  <button className="bg-[#2874f0] text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-[#1a65de]">+ Add</button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-white shadow-sm p-5 border-l-4 border-[#2874f0]">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="bg-blue-50 text-[#2874f0] text-xs px-2 py-0.5 rounded font-semibold">DEFAULT</span>
-                      <button className="text-gray-400 hover:text-[#2874f0]"><PencilIcon className="h-4 w-4" /></button>
-                    </div>
-                    <p className="font-semibold text-gray-900 text-sm">Home</p>
-                    <p className="text-sm text-gray-500 mt-1">123 Main Street, Kathmandu, Bagmati 44600, Nepal</p>
-                    <p className="text-sm text-gray-500 mt-1">+977-9876543210</p>
+                {addresses.length === 0 ? (
+                  <div className="bg-white shadow-sm rounded-lg p-10 text-center">
+                    <MapPinIcon className="h-12 w-12 text-gray-200 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm font-medium">No saved addresses</p>
+                    <p className="text-gray-400 text-xs mt-1">Add an address to speed up checkout.</p>
                   </div>
-                  <div className="bg-white shadow-sm p-5">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded font-semibold">WORK</span>
-                      <button className="text-gray-400 hover:text-[#2874f0]"><PencilIcon className="h-4 w-4" /></button>
-                    </div>
-                    <p className="font-semibold text-gray-900 text-sm">Office</p>
-                    <p className="text-sm text-gray-500 mt-1">456 Business Road, Lalitpur, Bagmati 44700, Nepal</p>
-                    <p className="text-sm text-gray-500 mt-1">+977-9812345678</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {addresses.map(addr => (
+                      <div key={addr.id} className={`bg-white shadow-sm rounded-lg p-4 sm:p-5 ${addr.isDefault ? 'border-l-4 border-[#2874f0]' : ''}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className={`text-xs px-2 py-0.5 rounded font-semibold uppercase ${addr.isDefault ? 'bg-blue-50 text-[#2874f0]' : 'bg-gray-100 text-gray-600'}`}>
+                            {addr.isDefault ? 'Default' : addr.type}
+                          </span>
+                          <button className="text-gray-400 hover:text-[#2874f0]"><PencilIcon className="h-4 w-4" /></button>
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm capitalize">{addr.type}</p>
+                        <p className="text-sm text-gray-500 mt-1">{addr.street}, {addr.city}, {addr.state} {addr.zipCode}, {addr.country}</p>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
             {/* Settings Tab */}
             {activeTab === 'settings' && (
-              <div className="bg-white shadow-sm p-6">
+              <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-5">Account Settings</h2>
                 <div className="space-y-5">
                   <div>
@@ -293,7 +343,7 @@ const AccountPage: React.FC = () => {
                         { label: 'Newsletter', desc: 'Weekly newsletter with latest products' },
                         { label: 'Security alerts', desc: 'Account security notifications' },
                       ].map((item, index) => (
-                        <label key={index} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                        <label key={index} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 cursor-pointer">
                           <div>
                             <p className="text-sm font-medium text-gray-800">{item.label}</p>
                             <p className="text-xs text-gray-400">{item.desc}</p>
@@ -314,9 +364,26 @@ const AccountPage: React.FC = () => {
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-40">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 flex flex-col items-center py-2 text-xs font-medium transition-colors ${
+              activeTab === tab.key ? 'text-[#2874f0]' : 'text-gray-500'
+            }`}
+          >
+            <tab.icon className="h-5 w-5 mb-0.5" />
+            {tab.label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 };
