@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
-const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5177'];
+const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5177', 'https://neptronixtechnology.netlify.app'];
 const envOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(s => s.trim())
