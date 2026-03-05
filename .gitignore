@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# exclude unrelated repo
+neptronix-app/
+
+# builds
+dist/
+build/
+
+# env
+.env
+.env.*
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# python
+venv/
+__pycache__/
+*.pyc
