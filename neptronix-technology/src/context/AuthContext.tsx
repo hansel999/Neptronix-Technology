@@ -23,7 +23,8 @@ type AuthAction =
   | { type: 'REGISTER_SUCCESS'; payload: User }
   | { type: 'REGISTER_FAILURE'; payload: string }
   | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'CLEAR_ERROR' };
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'SET_LOADING'; payload: boolean };
 
 interface AuthContextType {
   state: AuthState;
@@ -115,6 +116,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         error: null
       };
+
+    case 'SET_LOADING':
+      return {
+        ...state,
+        isLoading: action.payload
+      };
     
     default:
       return state;
@@ -122,24 +129,35 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const hasToken = !!localStorage.getItem('authToken');
   const [state, dispatch] = useReducer(authReducer, {
     user: null,
     isAuthenticated: false,
     isMfaPending: false,
     pendingUser: null,
-    isLoading: false,
+    isLoading: hasToken,
     error: null
   });
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          dispatch({ type: 'LOGIN_SUCCESS', payload: JSON.parse(savedUser) });
+        } catch {
+          localStorage.removeItem('user');
+        }
+      }
       authAPI.me()
         .then(({ user }) => dispatch({ type: 'LOGIN_SUCCESS', payload: normalizeUser(user) }))
         .catch(() => {
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
-        });
+          dispatch({ type: 'LOGOUT' });
+        })
+        .finally(() => dispatch({ type: 'SET_LOADING', payload: false }));
     } else {
       const savedUser = localStorage.getItem('user');
       if (savedUser) {

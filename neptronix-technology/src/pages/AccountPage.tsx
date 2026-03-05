@@ -64,6 +64,17 @@ const AccountPage: React.FC = () => {
     }
   }, [authState.isAuthenticated, activeTab]);
 
+  if (authState.isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-[#2874f0] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Loading your account…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!authState.isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#f1f3f6] flex items-center justify-center px-4">
