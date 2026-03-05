@@ -121,16 +121,22 @@ const seedProducts = async () => {
 
 const seedAdmin = async () => {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@neptronix.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const exists = await User.findOne({ email: adminEmail });
   if (!exists) {
     await User.create({
       firstName: 'Admin',
       lastName: 'Neptronix',
       email: adminEmail,
-      password: 'admin123',
+      password: adminPassword,
       isAdmin: true,
     });
     console.log(`🔑 Admin user created: ${adminEmail}`);
+  } else {
+    exists.password = adminPassword;
+    exists.isAdmin = true;
+    await exists.save();
+    console.log(`🔑 Admin password reset: ${adminEmail}`);
   }
 };
 
