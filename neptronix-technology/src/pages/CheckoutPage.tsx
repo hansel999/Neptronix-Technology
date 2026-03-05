@@ -297,7 +297,8 @@ const CheckoutPage: React.FC = () => {
       const data = await ordersAPI.place(orderPayload);
       const newOrderId = data?.order?._id ?? data?.order?.id ?? ('NTX-' + Date.now().toString().slice(-8));
       setOrderId(newOrderId);
-    } catch {
+    } catch (err: any) {
+      console.error('Order placement failed:', err?.message ?? err);
       setOrderId('NTX-' + Date.now().toString().slice(-8));
     } finally {
       setOrderPlaced(true);
