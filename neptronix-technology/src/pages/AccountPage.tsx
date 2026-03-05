@@ -13,7 +13,7 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
-import { ordersAPI } from '../services/api';
+import { ordersAPI, authAPI } from '../services/api';
 
 type Tab = 'profile' | 'orders' | 'addresses' | 'settings';
 
@@ -37,6 +37,23 @@ const AccountPage: React.FC = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
 
   const user = authState.user;
+
+  const NOTIF_KEY = `notif_prefs_${user?.id ?? 'guest'}`;
+  const loadNotifPrefs = () => {
+    try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || 'null'); } catch { return null; }
+  };
+  const [notifPrefs, setNotifPrefs] = useState<boolean[]>(() => loadNotifPrefs() ?? [true, true, false, false]);
+
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [showPwForm, setShowPwForm] = useState(false);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName ?? '',
@@ -112,6 +129,46 @@ const AccountPage: React.FC = () => {
       phone: profileData.phone
     });
     setIsEditing(false);
+  };
+
+  const handleChangePassword = async () => {
+    setPwError('');
+    setPwSuccess('');
+    if (!pwForm.current) { setPwError('Enter your current password'); return; }
+    if (pwForm.next.length < 6) { setPwError('New password must be at least 6 characters'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('New passwords do not match'); return; }
+    setPwLoading(true);
+    try {
+      await authAPI.changePassword(pwForm.current, pwForm.next);
+      setPwSuccess('Password changed successfully');
+      setPwForm({ current: '', next: '', confirm: '' });
+      setShowPwForm(false);
+    } catch (e: any) {
+      setPwError(e?.message ?? 'Failed to change password');
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteError('');
+    if (!deletePassword) { setDeleteError('Enter your password to confirm'); return; }
+    setDeleteLoading(true);
+    try {
+      await authAPI.deleteAccount();
+      logout();
+      navigate('/');
+    } catch (e: any) {
+      setDeleteError(e?.message ?? 'Failed to delete account');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleNotifToggle = (index: number) => {
+    const updated = notifPrefs.map((v, i) => (i === index ? !v : v));
+    setNotifPrefs(updated);
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
   };
 
   const initials = `${profileData.firstName?.[0] ?? ''}${profileData.lastName?.[0] ?? ''}`.toUpperCase() || '?';
@@ -345,37 +402,129 @@ const AccountPage: React.FC = () => {
 
             {/* Settings Tab */}
             {activeTab === 'settings' && (
-              <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-5">Account Settings</h2>
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Notifications</h3>
-                    <div className="space-y-3">
-                      {[
-                        { label: 'Order updates', desc: 'Get notified about order status changes' },
-                        { label: 'Promotions', desc: 'Receive promotional offers and deals' },
-                        { label: 'Newsletter', desc: 'Weekly newsletter with latest products' },
-                        { label: 'Security alerts', desc: 'Account security notifications' },
-                      ].map((item, index) => (
-                        <label key={index} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 cursor-pointer">
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{item.label}</p>
-                            <p className="text-xs text-gray-400">{item.desc}</p>
-                          </div>
-                          <input type="checkbox" defaultChecked={index < 2} className="h-4 w-4 accent-[#2874f0]" />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Password</h3>
-                    <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-200 font-medium">Change Password</button>
-                  </div>
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-semibold text-red-500 mb-3">Danger Zone</h3>
-                    <button className="bg-red-50 text-red-500 px-4 py-2 rounded text-sm hover:bg-red-100 font-medium">Delete Account</button>
+              <div className="space-y-3">
+
+                {/* Notifications */}
+                <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Notifications</h3>
+                  <div className="space-y-1">
+                    {[
+                      { label: 'Order updates', desc: 'Get notified about order status changes' },
+                      { label: 'Promotions', desc: 'Receive promotional offers and deals' },
+                      { label: 'Newsletter', desc: 'Weekly newsletter with latest products' },
+                      { label: 'Security alerts', desc: 'Account security notifications' },
+                    ].map((item, index) => (
+                      <label key={index} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 cursor-pointer">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{item.label}</p>
+                          <p className="text-xs text-gray-400">{item.desc}</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={notifPrefs[index] ?? false}
+                          onChange={() => handleNotifToggle(index)}
+                          className="h-4 w-4 accent-[#2874f0]"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
+
+                {/* Change Password */}
+                <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Password</h3>
+                    {!showPwForm && (
+                      <button
+                        onClick={() => { setShowPwForm(true); setPwError(''); setPwSuccess(''); }}
+                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-200 font-medium"
+                      >
+                        Change Password
+                      </button>
+                    )}
+                  </div>
+                  {pwSuccess && <p className="text-green-600 text-sm mb-3 bg-green-50 px-3 py-2 rounded">{pwSuccess}</p>}
+                  {showPwForm && (
+                    <div className="space-y-3">
+                      {[
+                        { key: 'current', label: 'Current Password' },
+                        { key: 'next', label: 'New Password' },
+                        { key: 'confirm', label: 'Confirm New Password' },
+                      ].map(f => (
+                        <div key={f.key}>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
+                          <input
+                            type="password"
+                            value={(pwForm as Record<string, string>)[f.key]}
+                            onChange={e => setPwForm(p => ({ ...p, [f.key]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:border-[#2874f0]"
+                          />
+                        </div>
+                      ))}
+                      {pwError && <p className="text-red-500 text-xs">{pwError}</p>}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleChangePassword}
+                          disabled={pwLoading}
+                          className="bg-[#2874f0] text-white px-4 py-2 rounded text-sm font-bold hover:bg-[#1a65de] disabled:opacity-60"
+                        >
+                          {pwLoading ? 'Saving…' : 'Save Password'}
+                        </button>
+                        <button
+                          onClick={() => { setShowPwForm(false); setPwForm({ current: '', next: '', confirm: '' }); setPwError(''); }}
+                          className="border border-gray-200 text-gray-600 px-4 py-2 rounded text-sm hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delete Account */}
+                <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                  <h3 className="text-sm font-semibold text-red-500 mb-1">Danger Zone</h3>
+                  <p className="text-xs text-gray-400 mb-3">Once deleted, your account and all data cannot be recovered.</p>
+                  {!showDeleteConfirm ? (
+                    <button
+                      onClick={() => { setShowDeleteConfirm(true); setDeleteError(''); }}
+                      className="bg-red-50 text-red-500 px-4 py-2 rounded text-sm hover:bg-red-100 font-medium"
+                    >
+                      Delete Account
+                    </button>
+                  ) : (
+                    <div className="space-y-3 border border-red-100 rounded-lg p-4 bg-red-50">
+                      <p className="text-sm font-medium text-red-700">Are you sure? This cannot be undone.</p>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Enter your password to confirm</label>
+                        <input
+                          type="password"
+                          value={deletePassword}
+                          onChange={e => { setDeletePassword(e.target.value); setDeleteError(''); }}
+                          placeholder="Your password"
+                          className="w-full px-3 py-2 border border-red-200 rounded text-sm focus:outline-none focus:border-red-400"
+                        />
+                      </div>
+                      {deleteError && <p className="text-red-600 text-xs">{deleteError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleDeleteAccount}
+                          disabled={deleteLoading}
+                          className="bg-red-500 text-white px-4 py-2 rounded text-sm font-bold hover:bg-red-600 disabled:opacity-60"
+                        >
+                          {deleteLoading ? 'Deleting…' : 'Yes, Delete My Account'}
+                        </button>
+                        <button
+                          onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); setDeleteError(''); }}
+                          className="border border-gray-200 text-gray-600 px-4 py-2 rounded text-sm hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 

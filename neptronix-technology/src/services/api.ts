@@ -54,6 +54,9 @@ export const authAPI = {
 
   changePassword: (currentPassword: string, newPassword: string) =>
     handle(fetch(`${BASE_URL}/auth/change-password`, { method: 'PUT', headers: headers(true), body: JSON.stringify({ currentPassword, newPassword }) })),
+
+  deleteAccount: () =>
+    handle(fetch(`${BASE_URL}/auth/account`, { method: 'DELETE', headers: headers(true) })),
 };
 
 // ── Products ──

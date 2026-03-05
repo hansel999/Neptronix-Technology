@@ -84,4 +84,14 @@ router.put('/change-password', protect, async (req, res) => {
   }
 });
 
+// DELETE /api/auth/account
+router.delete('/account', protect, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user._id);
+    res.json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
