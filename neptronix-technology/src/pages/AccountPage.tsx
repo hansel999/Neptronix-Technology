@@ -23,7 +23,7 @@ interface ApiOrder {
   createdAt?: string;
   status?: string;
   total?: number;
-  items?: { product?: { name?: string }; quantity?: number; price?: number }[];
+  items?: { name?: string; image?: string; quantity?: number; price?: number }[];
   trackingNumber?: string;
   estimatedDelivery?: string;
 }
@@ -78,6 +78,17 @@ const AccountPage: React.FC = () => {
       phone: user?.phone ?? ''
     });
   }, [user]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      ordersAPI.getAll()
+        .then((data: any) => {
+          const list = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+          setOrders(list);
+        })
+        .catch(() => setOrders([]));
+    }
+  }, [authState.isAuthenticated]);
 
   useEffect(() => {
     if (authState.isAuthenticated && activeTab === 'orders') {
@@ -356,7 +367,7 @@ const AccountPage: React.FC = () => {
                           <div className="border-t border-gray-100 pt-3 space-y-1.5">
                             {order.items.map((item, i) => (
                               <div key={i} className="flex justify-between text-sm gap-2">
-                                <span className="text-gray-600 truncate">{item.product?.name ?? 'Product'} ×{item.quantity ?? 1}</span>
+                                <span className="text-gray-600 truncate">{item.name ?? 'Product'} ×{item.quantity ?? 1}</span>
                                 <span className="font-medium shrink-0">Rs.{(item.price ?? 0).toLocaleString()}</span>
                               </div>
                             ))}

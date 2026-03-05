@@ -271,6 +271,8 @@ const CheckoutPage: React.FC = () => {
       const orderPayload = {
         items: selectedItems.map(item => ({
           productId: item.product.id,
+          name: item.product.name,
+          image: item.product.images?.[0] ?? '',
           quantity: item.quantity,
           price: item.product.price,
         })),
