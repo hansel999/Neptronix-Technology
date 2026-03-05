@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import ScrollToTop from './components/ScrollToTop'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import ProductsPage from './pages/ProductsPage'
@@ -21,6 +22,7 @@ function App() {
       <ProductProvider>
       <CartProvider>
         <Layout>
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductsPage />} />

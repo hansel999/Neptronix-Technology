@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { ordersAPI } from '../services/api';
 
 type Step = 'shipping' | 'payment' | 'review';
 type PaymentMethod = 'esewa' | 'khalti' | 'credit_card' | 'cod';
@@ -265,11 +266,41 @@ const CheckoutPage: React.FC = () => {
     finalizeOrder();
   };
 
-  const finalizeOrder = () => {
-    const newOrderId = 'NTX-' + Date.now().toString().slice(-8);
-    setOrderId(newOrderId);
-    setOrderPlaced(true);
-    if (!isBuyNow) clearCart();
+  const finalizeOrder = async () => {
+    try {
+      const orderPayload = {
+        items: selectedItems.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+        shipping: {
+          firstName: shippingData.firstName,
+          lastName: shippingData.lastName,
+          email: shippingData.email,
+          phone: shippingData.phone,
+          street: shippingData.street,
+          city: shippingData.city,
+          state: shippingData.state,
+          zipCode: shippingData.zipCode,
+          country: shippingData.country,
+          notes: shippingData.notes,
+        },
+        payment: { method: paymentMethod },
+        subtotal,
+        shippingCost: shipping,
+        tax,
+        total,
+      };
+      const data = await ordersAPI.place(orderPayload);
+      const newOrderId = data?.order?._id ?? data?.order?.id ?? ('NTX-' + Date.now().toString().slice(-8));
+      setOrderId(newOrderId);
+    } catch {
+      setOrderId('NTX-' + Date.now().toString().slice(-8));
+    } finally {
+      setOrderPlaced(true);
+      if (!isBuyNow) clearCart();
+    }
   };
 
   const handleGatewaySuccess = () => {

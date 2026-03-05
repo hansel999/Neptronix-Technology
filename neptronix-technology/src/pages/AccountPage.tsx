@@ -58,7 +58,10 @@ const AccountPage: React.FC = () => {
     if (authState.isAuthenticated && activeTab === 'orders') {
       setOrdersLoading(true);
       ordersAPI.getAll()
-        .then((data: ApiOrder[]) => setOrders(Array.isArray(data) ? data : []))
+        .then((data: any) => {
+          const list = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+          setOrders(list);
+        })
         .catch(() => setOrders([]))
         .finally(() => setOrdersLoading(false));
     }
