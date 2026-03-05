@@ -34,23 +34,22 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/orders', require('./routes/orders'));
 
-// Health check
+// Health check (always responds regardless of DB state)
 app.get('/api/health', (req, res) => res.json({ status: 'ok', message: 'Neptronix API running' }));
 
-// Connect to MongoDB then start server
+// Start server immediately, then connect to MongoDB
 const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('✅ MongoDB connected');
-    // Seed initial products if DB is empty
     const { seedProducts, seedAdmin } = require('./utils/seed');
     await seedProducts();
     await seedAdmin();
-    app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
   })
   .catch(err => {
     console.error('❌ MongoDB connection error:', err.message);
-    process.exit(1);
   });
