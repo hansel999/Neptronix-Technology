@@ -103,5 +103,13 @@ export const ordersAPI = {
     handle(fetch(`${BASE_URL}/orders/${id}/status`, { method: 'PUT', headers: headers(true), body: JSON.stringify({ status }) })),
 };
 
+export const usersAPI = {
+  getAll: () =>
+    handle(fetch(`${BASE_URL}/auth/users`, { headers: headers(true) })),
+
+  delete: (id: string) =>
+    handle(fetch(`${BASE_URL}/auth/users/${id}`, { method: 'DELETE', headers: headers(true) })),
+};
+
 export const checkHealth = () =>
   handle(fetch(`${BASE_URL}/health`));

@@ -94,4 +94,28 @@ router.delete('/account', protect, async (req, res) => {
   }
 });
 
+// GET /api/auth/users — admin only
+router.get('/users', protect, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin only' });
+    const users = await User.find({}).sort({ createdAt: -1 });
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/auth/users/:id — admin only
+router.delete('/users/:id', protect, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin only' });
+    if (req.params.id === req.user._id.toString())
+      return res.status(400).json({ message: 'Cannot delete your own account' });
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
